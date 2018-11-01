@@ -167,7 +167,7 @@ namespace PVR
     bool HasRecording(void) const;
 
     /*!
-     * @return True if this channel has archive support, false otherwise
+     * @return True if this channel has a server-side back buffer, false otherwise
      */
     bool HasArchive(void) const;
 

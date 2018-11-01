@@ -954,7 +954,7 @@
                 "firstaired", "hastimer", "isactive", "parentalrating",
                 "wasactive", "thumbnail", "rating", "originaltitle", "cast",
                 "director", "writer", "year", "imdbnumber", "hastimerrule",
-                "hasrecording", "recording", "isseries" ]
+                "hasrecording", "recording", "isseries", "isplayable" ]
     }
   },
   "PVR.Details.Broadcast": {
@@ -989,7 +989,8 @@
       "hastimerrule": { "type": "boolean" },
       "hasrecording": { "type": "boolean" },
       "recording": { "type": "string" },
-      "isseries": { "type": "boolean" }
+      "isseries": { "type": "boolean" },
+      "isplayable": { "type": "boolean" }
     }
   },
   "PVR.Fields.Channel": {
