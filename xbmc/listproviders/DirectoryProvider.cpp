@@ -190,6 +190,7 @@ bool CDirectoryProvider::Update(bool forceRefresh)
   fireJob |= UpdateURL();
   fireJob |= UpdateSort();
   fireJob |= UpdateLimit();
+  fireJob &= !m_currentUrl.empty();
 
   CSingleLock lock(m_section);
   if (m_updateState == INVALIDATED)
@@ -296,7 +297,8 @@ void CDirectoryProvider::OnPVRManagerEvent(const PVR::PVREvent& event)
         event == PVR::PVREvent::ManagerStopped ||
         event == PVR::PVREvent::ManagerError ||
         event == PVR::PVREvent::ManagerInterrupted ||
-        event == PVR::PVREvent::RecordingsInvalidated)
+        event == PVR::PVREvent::RecordingsInvalidated ||
+        event == PVR::PVREvent::TimersInvalidated)
       m_updateState = INVALIDATED;
   }
 }

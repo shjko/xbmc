@@ -171,6 +171,7 @@
 #include "XHandle.h"
 #include "XTimeUtils.h"
 #include "platform/posix/filesystem/PosixDirectory.h"
+#include "platform/posix/PlatformPosix.h"
 #endif
 
 #if defined(TARGET_ANDROID)
@@ -278,6 +279,18 @@ void CApplication::HandlePortEvents()
             settings->SetInt(CSettings::SETTING_WINDOW_HEIGHT, newEvent.resize.h);
             settings->Save();
           }
+#ifdef TARGET_WINDOWS
+          else
+          {
+            // this may occurs when OS tries to resize application window 
+            //CDisplaySettings::GetInstance().SetCurrentResolution(RES_DESKTOP, true);
+            //auto& gfxContext = CServiceBroker::GetWinSystem()->GetGfxContext();
+            //gfxContext.SetVideoResolution(gfxContext.GetVideoResolution(), true);
+            // try to resize window back to it's full screen size
+            auto& res_info = CDisplaySettings::GetInstance().GetResolutionInfo(RES_DESKTOP);
+            CServiceBroker::GetWinSystem()->ResizeWindow(res_info.iScreenWidth, res_info.iScreenHeight, 0, 0);
+          }
+#endif
         }
         break;
       case XBMC_VIDEOMOVE:
@@ -1303,6 +1316,7 @@ bool CApplication::LoadSkin(const std::string& skinID)
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(this);
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&CServiceBroker::GetPlaylistPlayer());
   CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&g_fontManager);
+  CServiceBroker::GetGUI()->GetWindowManager().AddMsgTarget(&CServiceBroker::GetGUI()->GetStereoscopicsManager());
   CServiceBroker::GetGUI()->GetWindowManager().SetCallback(*this);
   //@todo should be done by GUIComponents
   CServiceBroker::GetGUI()->GetWindowManager().Initialize();
@@ -2511,7 +2525,7 @@ bool CApplication::Cleanup()
 
 void CApplication::Stop(int exitCode)
 {
-  CLog::Log(LOGNOTICE, "stop player");
+  CLog::Log(LOGNOTICE, "Stopping player");
   m_appPlayer.ClosePlayer();
 
   {
@@ -2568,7 +2582,7 @@ void CApplication::Stop(int exitCode)
     CApplicationMessenger::GetInstance().Stop();
     m_AppFocused = false;
     m_ExitCode = exitCode;
-    CLog::Log(LOGNOTICE, "stop all");
+    CLog::Log(LOGNOTICE, "Stopping all");
 
     // cancel any jobs from the jobmanager
     CJobManager::GetInstance().CancelJobs();
@@ -2587,7 +2601,7 @@ void CApplication::Stop(int exitCode)
 #ifdef HAS_ZEROCONF
     if(CZeroconfBrowser::IsInstantiated())
     {
-      CLog::Log(LOGNOTICE, "stop zeroconf browser");
+      CLog::Log(LOGNOTICE, "Stopping zeroconf browser");
       CZeroconfBrowser::GetInstance()->Stop();
       CZeroconfBrowser::ReleaseInstance();
     }
@@ -2623,7 +2637,7 @@ void CApplication::Stop(int exitCode)
     m_pActiveAE->Shutdown();
     m_pActiveAE.reset();
 
-    CLog::Log(LOGNOTICE, "stopped");
+    CLog::Log(LOGNOTICE, "Application stopped");
   }
   catch (...)
   {
@@ -3035,9 +3049,8 @@ void CApplication::OnPlayBackStarted(const CFileItem &file)
 {
   CLog::LogF(LOGDEBUG,"CApplication::OnPlayBackStarted");
 
-  // check if VideoPlayer should set file item stream details from its current streams
-  if (file.GetProperty("get_stream_details_from_player").asBoolean())
-    m_appPlayer.SetUpdateStreamDetails();
+  // Always update file item stream details
+  m_appPlayer.SetUpdateStreamDetails();
 
   if (m_stackHelper.IsPlayingISOStack() || m_stackHelper.IsPlayingRegularStack())
     m_itemCurrentFile.reset(new CFileItem(*m_stackHelper.GetRegisteredStack(file)));
@@ -3884,6 +3897,8 @@ bool CApplication::OnMessage(CGUIMessage& message)
   case GUI_MSG_PLAYLISTPLAYER_STOPPED:
     m_itemCurrentFile->Reset();
     CServiceBroker::GetGUI()->GetInfoManager().ResetCurrentItem();
+    if (m_appPlayer.IsPlaying())
+      StopPlaying();
     PlaybackCleanup();
     return true;
 
@@ -4092,6 +4107,14 @@ void CApplication::ProcessSlow()
   {
     CheckShutdown();
   }
+
+#if defined(TARGET_POSIX)
+  if (CPlatformPosix::TestQuitFlag())
+  {
+    CLog::Log(LOGNOTICE, "Quitting due to POSIX signal");
+    CApplicationMessenger::GetInstance().PostMsg(TMSG_QUIT);
+  }
+#endif
 
   // check if we should restart the player
   CheckDelayedPlayerRestart();

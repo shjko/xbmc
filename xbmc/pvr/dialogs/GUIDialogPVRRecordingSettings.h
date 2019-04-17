@@ -17,6 +17,7 @@
 #include "pvr/PVRTypes.h"
 
 class CSetting;
+struct IntegerSettingOption;
 
 namespace PVR
 {
@@ -26,6 +27,7 @@ namespace PVR
     CGUIDialogPVRRecordingSettings();
 
     void SetRecording(const CPVRRecordingPtr &recording);
+    static bool CanEditRecording(const CFileItem& item);
 
   protected:
     // implementation of ISettingCallback
@@ -42,7 +44,7 @@ namespace PVR
 
   private:
     static void LifetimesFiller(std::shared_ptr<const CSetting> setting,
-                                std::vector<std::pair<std::string, int>> &list,
+                                std::vector<IntegerSettingOption> &list,
                                 int &current, void *data);
 
     CPVRRecordingPtr m_recording;

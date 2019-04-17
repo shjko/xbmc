@@ -23,6 +23,7 @@
 #include "network/DNSNameCache.h"
 #include "profiles/ProfileManager.h"
 #include "settings/lib/Setting.h"
+#include "settings/lib/SettingDefinitions.h"
 #include "settings/lib/SettingsManager.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
@@ -173,7 +174,6 @@ void CAdvancedSettings::Initialize()
   m_DXVACheckCompatibility = false;
   m_DXVACheckCompatibilityPresent = false;
   m_DXVAForceProcessorRenderer = true;
-  m_DXVAAllowHqScaling = true;
   m_videoFpsDetect = 1;
   m_maxTempo = 1.55f;
   m_videoPreferStereoStream = false;
@@ -324,13 +324,30 @@ void CAdvancedSettings::Initialize()
   m_videoMovieSetExtraArt = {};
   m_videoMusicVideoExtraArt = {};
 
-  m_iEpgUpdateCheckInterval = 300; /* check if tables need to be updated every 5 minutes */
-  m_iEpgCleanupInterval = 900;     /* remove old entries from the EPG every 15 minutes */
-  m_iEpgActiveTagCheckInterval = 60; /* check for updated active tags every minute */
-  m_iEpgRetryInterruptedUpdateInterval = 30; /* retry an interrupted epg update after 30 seconds */
-  m_iEpgUpdateEmptyTagsInterval = 60; /* override user selectable EPG update interval for empty EPG tags */
-  m_bEpgDisplayUpdatePopup = true; /* display a progress popup while updating EPG data from clients */
-  m_bEpgDisplayIncrementalUpdatePopup = false; /* also display a progress popup while doing incremental EPG updates */
+  m_iEpgUpdateCheckInterval = 300; /* Check every X seconds, if EPG data need to be updated. This does not mean that
+                                      every X seconds an EPG update is actually triggered, it's just the interval how
+                                      often to check whether an update should be triggered. If this value is greater
+                                      than GUI setting 'epg.epgupdate' value, then EPG updates will done with the value
+                                      specified for 'updatecheckinterval', effectively overriding the GUI setting's value. */
+  m_iEpgCleanupInterval = 900; /* Remove old entries from the EPG every X seconds */
+  m_iEpgActiveTagCheckInterval = 60; /* Check for updated active tags every X seconds */
+  m_iEpgRetryInterruptedUpdateInterval = 30; /* Retry an interrupted EPG update after X seconds */
+  m_iEpgUpdateEmptyTagsInterval = 7200; /* If a TV channel has no EPG data, try to obtain data for that channel every
+                                           X seconds. This overrides the GUI setting 'epg.epgupdate' value, but only
+                                           for channels without EPG data. If this value is less than 'updatecheckinterval'
+                                           value, then data update will be done with the interval specified by
+                                           'updatecheckinterval'.
+                                           Example 1: epg.epgupdate = 120 (minutes!), updatecheckinterval = 300,
+                                                      updateemptytagsinterval = 60 => trigger an EPG update for every
+                                                      channel without EPG data every 5 minutes and trigger an EPG update
+                                                      for every channel with EPG data every 2 hours.
+                                           Example 2: epg.epgupdate = 120 (minutes!), updatecheckinterval = 300,
+                                                      updateemptytagsinterval = 3600 => trigger an EPG update for every
+                                                      channel without EPG data every 2 hours and trigger an EPG update
+                                                      for every channel with EPG data every 1 hour. */
+  m_bEpgDisplayUpdatePopup = true; /* Display a progress popup while updating EPG data from clients */
+  m_bEpgDisplayIncrementalUpdatePopup = false; /* Display a progress popup while doing incremental EPG updates, but
+                                                  only if 'displayupdatepopup' is also enabled. */
 
   m_bEdlMergeShortCommBreaks = false;      // Off by default
   m_iEdlMaxCommBreakLength = 8 * 30 + 10;  // Just over 8 * 30 second commercial break.
@@ -718,7 +735,6 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     m_DXVACheckCompatibilityPresent = XMLUtils::GetBoolean(pElement,"checkdxvacompatibility", m_DXVACheckCompatibility);
 
     XMLUtils::GetBoolean(pElement,"forcedxvarenderer", m_DXVAForceProcessorRenderer);
-    XMLUtils::GetBoolean(pElement, "dxvaallowhqscaling", m_DXVAAllowHqScaling);
     XMLUtils::GetBoolean(pElement, "usedisplaycontrolhwstereo", m_useDisplayControlHWStereo);
     XMLUtils::GetBoolean(pElement, "allowdiscretedecoder", m_allowUseSeparateDeviceForDecoding);
     //0 = disable fps detect, 1 = only detect on timestamps with uniform spacing, 2 detect on all timestamps
@@ -1424,34 +1440,34 @@ bool CAdvancedSettings::CanLogComponent(int component) const
   return ((m_extraLogLevels & component) == component);
 }
 
-void CAdvancedSettings::SettingOptionsLoggingComponentsFiller(SettingConstPtr setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data)
+void CAdvancedSettings::SettingOptionsLoggingComponentsFiller(SettingConstPtr setting, std::vector<IntegerSettingOption> &list, int &current, void *data)
 {
-  list.push_back(std::make_pair(g_localizeStrings.Get(669), LOGSAMBA));
-  list.push_back(std::make_pair(g_localizeStrings.Get(670), LOGCURL));
-  list.push_back(std::make_pair(g_localizeStrings.Get(672), LOGFFMPEG));
-  list.push_back(std::make_pair(g_localizeStrings.Get(675), LOGJSONRPC));
-  list.push_back(std::make_pair(g_localizeStrings.Get(676), LOGAUDIO));
-  list.push_back(std::make_pair(g_localizeStrings.Get(680), LOGVIDEO));
-  list.push_back(std::make_pair(g_localizeStrings.Get(683), LOGAVTIMING));
-  list.push_back(std::make_pair(g_localizeStrings.Get(684), LOGWINDOWING));
-  list.push_back(std::make_pair(g_localizeStrings.Get(685), LOGPVR));
-  list.push_back(std::make_pair(g_localizeStrings.Get(686), LOGEPG));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(669), LOGSAMBA));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(670), LOGCURL));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(672), LOGFFMPEG));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(675), LOGJSONRPC));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(676), LOGAUDIO));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(680), LOGVIDEO));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(683), LOGAVTIMING));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(684), LOGWINDOWING));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(685), LOGPVR));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(686), LOGEPG));
 #ifdef HAS_DBUS
-  list.push_back(std::make_pair(g_localizeStrings.Get(674), LOGDBUS));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(674), LOGDBUS));
 #endif
 #ifdef HAS_WEB_SERVER
-  list.push_back(std::make_pair(g_localizeStrings.Get(681), LOGWEBSERVER));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(681), LOGWEBSERVER));
 #endif
 #ifdef HAS_AIRTUNES
-  list.push_back(std::make_pair(g_localizeStrings.Get(677), LOGAIRTUNES));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(677), LOGAIRTUNES));
 #endif
 #ifdef HAS_UPNP
-  list.push_back(std::make_pair(g_localizeStrings.Get(678), LOGUPNP));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(678), LOGUPNP));
 #endif
 #ifdef HAVE_LIBCEC
-  list.push_back(std::make_pair(g_localizeStrings.Get(679), LOGCEC));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(679), LOGCEC));
 #endif
-  list.push_back(std::make_pair(g_localizeStrings.Get(682), LOGDATABASE));
+  list.push_back(IntegerSettingOption(g_localizeStrings.Get(682), LOGDATABASE));
 }
 
 void CAdvancedSettings::SetExtraLogLevel(const std::vector<CVariant> &components)

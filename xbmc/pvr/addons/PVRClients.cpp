@@ -233,7 +233,8 @@ void CPVRClients::OnAddonEvent(const AddonEvent& event)
       typeid(event) == typeid(AddonEvents::ReInstalled))
   {
     // update addons
-    CJobManager::GetInstance().AddJob(new CPVRUpdateAddonsJob(event.id), nullptr);
+    if (CServiceBroker::GetAddonMgr().HasType(event.id, ADDON_PVRDLL))
+      CJobManager::GetInstance().AddJob(new CPVRUpdateAddonsJob(event.id), nullptr);
   }
 }
 
@@ -455,17 +456,6 @@ std::vector<SBackend> CPVRClients::GetBackendProperties() const
   return backendProperties;
 }
 
-bool CPVRClients::SupportsTimers() const
-{
-  bool bReturn = false;
-  ForCreatedClients(__FUNCTION__, [&bReturn](const CPVRClientPtr &client) {
-    if (!bReturn)
-      bReturn = client->GetClientCapabilities().SupportsTimers();
-    return PVR_ERROR_NO_ERROR;
-  });
-  return bReturn;
-}
-
 bool CPVRClients::GetTimers(CPVRTimersContainer *timers, std::vector<int> &failedClients)
 {
   return ForCreatedClients(__FUNCTION__, [timers](const CPVRClientPtr &client) {
@@ -596,6 +586,13 @@ void CPVRClients::ConnectionStateChange(
   {
     case PVR_CONNECTION_STATE_SERVER_UNREACHABLE:
       iMsg = 35505; // Server is unreachable
+      if (client->GetPreviousConnectionState() == PVR_CONNECTION_STATE_UNKNOWN ||
+          client->GetPreviousConnectionState() == PVR_CONNECTION_STATE_CONNECTING)
+      {
+        // Make our users happy. There were so many complaints about this notification because their TV backend
+        // was not up quick enough after Kodi start. So, ignore the very first 'server not reachable' notification.
+        bNotify = false;
+      }
       break;
     case PVR_CONNECTION_STATE_SERVER_MISMATCH:
       iMsg = 35506; // Server does not respond properly
